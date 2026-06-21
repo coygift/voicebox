@@ -1,0 +1,41 @@
+name: Build Voicebox
+
+on:
+  workflow_dispatch:  # Allows manual triggering
+
+jobs:
+  build:
+    runs-on: ubuntu-latest  # Uses a Linux runner
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Install just
+        run: cargo install just
+
+      - name: Install Bun
+        run: curl -fsSL https://bun.sh/install | bash
+
+      - name: Install Tauri dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y webkit2gtk-4.1 libappindicator3-1 librsvg2-dev
+
+      - name: Build Voicebox
+        run: |
+          source ~/.cargo/env
+          source ~/.bun/bin/bun
+          just setup
+          just build
+
+      - name: Upload built app
+        uses: actions/upload-artifact@v3
+        with:
+          name: voicebox-build
+          path: tauri/src-tauri/target/release/bundle/
