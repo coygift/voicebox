@@ -1,41 +1,69 @@
-name: Build Voicebox
+name: Build Voicebox Linux
 
 on:
-  workflow_dispatch:  # Allows manual triggering
+workflow_dispatch:
+
+permissions:
+contents: read
 
 jobs:
-  build:
-    runs-on: ubuntu-latest  # Uses a Linux runner
+build-linux:
+runs-on: ubuntu-24.04
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+```
+steps:
+  - name: Checkout repository
+    uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
+  - name: Install Rust
+    uses: dtolnay/rust-toolchain@stable
 
-      - name: Install just
-        run: cargo install just
+  - name: Cache Rust dependencies
+    uses: Swatinem/rust-cache@v2
 
-      - name: Install Bun
-        run: curl -fsSL https://bun.sh/install | bash
+  - name: Setup Bun
+    uses: oven-sh/setup-bun@v2
+    with:
+      bun-version: latest
 
-      - name: Install Tauri dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y webkit2gtk-4.1 libappindicator3-1 librsvg2-dev
+  - name: Install just
+    run: cargo install just
 
-      - name: Build Voicebox
-        run: |
-          source ~/.cargo/env
-          source ~/.bun/bin/bun
-          just setup
-          just build
+  - name: Install Tauri dependencies
+    run: |
+      sudo apt-get update
+      sudo apt-get install -y \
+        libwebkit2gtk-4.1-dev \
+        libappindicator3-dev \
+        librsvg2-dev \
+        patchelf \
+        build-essential \
+        pkg-config \
+        curl \
+        wget \
+        file \
+        libssl-dev \
+        libgtk-3-dev
 
-      - name: Upload built app
-        uses: actions/upload-artifact@v3
-        with:
-          name: voicebox-build
-          path: tauri/src-tauri/target/release/bundle/
+  - name: Run project setup
+    run: just setup
+
+  - name: Build Voicebox
+    run: just build
+
+  - name: Find build outputs
+    run: |
+      find . -type f | grep -E "(AppImage|deb|rpm|bundle)" || true
+
+  - name: Upload build artifacts
+    uses: actions/upload-artifact@v4
+    with:
+      name: voicebox-linux-build
+      if-no-files-found: warn
+      retention-days: 7
+      path: |
+        tauri/src-tauri/target/release/bundle/**
+        tauri/src-tauri/target/release/*.AppImage
+        tauri/src-tauri/target/release/*.deb
+        tauri/src-tauri/target/release/*.rpm
+```
